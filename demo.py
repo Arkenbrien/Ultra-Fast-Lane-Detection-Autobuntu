@@ -21,6 +21,9 @@ if __name__ == "__main__":
         cls_num_per_lane = 18
     elif cfg.dataset == 'Tusimple':
         cls_num_per_lane = 56
+    elif cfg.dataset == 'Live':
+        cls_num_per_lane = 18
+
     else:
         raise NotImplementedError
 
@@ -45,21 +48,32 @@ if __name__ == "__main__":
     ])
     if cfg.dataset == 'CULane':
         splits = ['test0_normal.txt', 'test1_crowd.txt', 'test2_hlight.txt', 'test3_shadow.txt', 'test4_noline.txt', 'test5_arrow.txt', 'test6_curve.txt', 'test7_cross.txt', 'test8_night.txt']
-        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, 'list/test_split/'+split),img_transform = img_transforms) for split in splits]
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
         img_w, img_h = 1640, 590
         row_anchor = culane_row_anchor
+
     elif cfg.dataset == 'Tusimple':
         splits = ['test.txt']
         datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms) for split in splits]
         img_w, img_h = 1280, 720
         row_anchor = tusimple_row_anchor
+
+    elif cfg.dataset == 'Live':
+        splits = ['test.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
+        print((datasets.__getitem__(0)[0][1]))
+        loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
+        img_w = loaded_im.shape[1]
+        img_h = loaded_im.shape[0]
+        row_anchor = culane_row_anchor
+
     else:
         raise NotImplementedError
     for split, dataset in zip(splits, datasets):
         loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle = False, num_workers=1)
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         print(split[:-3]+'avi')
-        vout = cv2.VideoWriter(split[:-3]+'avi', fourcc , 30.0, (img_w, img_h))
+        # vout = cv2.VideoWriter(split[:-3]+'avi', fourcc , 30.0, (img_w, img_h))
         for i, data in enumerate(tqdm.tqdm(loader)):
             imgs, names = data
             imgs = imgs.cuda()
@@ -88,6 +102,9 @@ if __name__ == "__main__":
                         if out_j[k, i] > 0:
                             ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
                             cv2.circle(vis,ppp,5,(0,255,0),-1)
-            vout.write(vis)
+
+            cv2.imshow('vis',vis)
+            cv2.waitKey(0)
+            # vout.write(vis)
         
-        vout.release()
+        # vout.release()

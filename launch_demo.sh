@@ -1,0 +1,1 @@
+python3 demo.py configs/culane.py --test_model weights/culane_18.pth --data_root /home/travis/lane_detection/Ultra-Fast-Lane-Detection-Autobuntu --dataset 'Live'
