@@ -22,7 +22,7 @@ if __name__ == "__main__":
     elif cfg.dataset == 'Tusimple':
         cls_num_per_lane = 56
     elif cfg.dataset == 'Live':
-        cls_num_per_lane = 18
+        cls_num_per_lane = 56
 
     else:
         raise NotImplementedError
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
         img_w = loaded_im.shape[1]
         img_h = loaded_im.shape[0]
-        row_anchor = culane_row_anchor
+        row_anchor = tusimple_row_anchor
 
     else:
         raise NotImplementedError
@@ -103,6 +103,7 @@ if __name__ == "__main__":
                             ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
                             cv2.circle(vis,ppp,5,(0,255,0),-1)
 
+            vis = cv2.resize(vis, (640,480))
             cv2.imshow('vis',vis)
             save_path = cfg.save_loc + '/some_name.jpg'
             print(save_path)
