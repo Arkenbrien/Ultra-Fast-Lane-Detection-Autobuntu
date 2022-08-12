@@ -104,7 +104,11 @@ if __name__ == "__main__":
                             cv2.circle(vis,ppp,5,(0,255,0),-1)
 
             cv2.imshow('vis',vis)
+            save_path = cfg.save_loc + '/some_name.jpg'
+            print(save_path)
+            cv2.imwrite(str(save_path),vis)
             cv2.waitKey(0)
+            
             # vout.write(vis)
         
         # vout.release()

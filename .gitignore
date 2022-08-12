@@ -15,3 +15,6 @@ tmp
 model2.py
 
 *.pt
+
+/weights
+/download
