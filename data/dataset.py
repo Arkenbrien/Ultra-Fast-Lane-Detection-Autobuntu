@@ -5,11 +5,10 @@ import pdb
 import numpy as np
 import cv2
 from data.mytransforms import find_start_pos
-
+import time
 
 def loader_func(path):
     return Image.open(path)
-
 
 class LaneTestDataset(torch.utils.data.Dataset):
     def __init__(self, path, list_path, img_transform=None):
@@ -34,6 +33,44 @@ class LaneTestDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.list)
 
+class LaneTestDatasetRos(torch.utils.data.Dataset):
+
+    def __init__(self, topic, img_transform=None):
+        import rospy
+        from std_msgs.msg import String
+        from sensor_msgs.msg import Image
+        from cv_bridge import CvBridge, CvBridgeError
+
+        self.img_transform = img_transform
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber(topic, Image, self.image_callback)
+
+        # rospy.init_node('wt', anonymous=True)
+        # time.sleep(1)
+        # r = rospy.Rate()
+        # r.sleep()
+
+        super(LaneTestDatasetRos, self).__init__()
+
+    def image_callback(self,data):
+        # try:
+        # self.cv_image = self.bridge.imgmsg_to_cv2(data,desired_encoding= "bgr8")
+        # self.torch_im =  torch.from_numpy(self.cv_image ).long()
+        self.cv_image = np.frombuffer(data.data, dtype=np.uint8).reshape(data.height, data.width, -1)
+        # print(data.height, data.width)
+        self.pil_im = Image.fromarray(self.cv_image)
+        # except CvBridgeError as e:
+        #     print(e)
+          
+    def __getitem__(self, index):
+        name = 'ros'
+        img = self.pil_im
+        if self.img_transform is not None:
+            img = self.img_transform(img)
+        return img, name
+
+    def __len__(self):
+        return 1
 
 class LaneClsDataset(torch.utils.data.Dataset):
     def __init__(self, path, list_path, img_transform = None,target_transform = None,simu_transform = None, griding_num=50, load_name = False,
