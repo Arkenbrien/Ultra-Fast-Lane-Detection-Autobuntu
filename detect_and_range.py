@@ -11,9 +11,27 @@ from data.dataset import LaneTestDatasetRos
 import time
 from data.constant import culane_row_anchor, tusimple_row_anchor
 
-if __name__ == "__main__":
-    torch.backends.cudnn.benchmark = True
+from lidar2cam_projection.msg import pixel_ranges
+from lidar2cam_projection.msg import pixel_range
 
+import rospy
+
+class pixel_range_sub(object):
+    def __init__(self):
+        self.pixel_sub  = rospy.Subscriber("/pixel_range_cloud", pixel_ranges, self.get_pixel_range)
+
+    def get_pixel_range(self, data):
+        self.pixel_vector =  data
+
+
+if __name__ == "__main__":
+    
+
+    rospy.init_node('pixel_listener', anonymous=True)
+    pixel_range_dat = pixel_range_sub()
+    time.sleep(1)
+
+    torch.backends.cudnn.benchmark = True
     args, cfg = merge_config()
 
     dist_print('start testing...')
@@ -51,8 +69,8 @@ if __name__ == "__main__":
     ])
 
     if cfg.dataset == 'ROS':
-        import rospy 
-        rospy.init_node('ros_ultrafast_lane', anonymous=True)
+        # import rospy 
+        # rospy.init_node('ros_ultrafast_lane', anonymous=True)
         splits = ['topic.txt']
         datasets = [LaneTestDatasetRos(cfg.ros_topic,img_transform = img_transforms) for split in splits]
         r = rospy.Rate(1)
@@ -89,6 +107,8 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError
 
+        pixel_info = pixel_range_dat.pixel_vector
+
         for split, dataset in zip(splits, datasets):
             loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle = False, num_workers=1)
             for i, data in enumerate(loader):
@@ -118,6 +138,15 @@ if __name__ == "__main__":
                             if out_j[k, i] > 0:
                                 ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
                                 cv2.circle(datasets[0].cv_image,ppp,10,(0,0,255),-1)
+
+                for point in pixel_info.points:
+                    pixel_u = point.u
+                    pixel_v = point.v
+                    pixel_r = point.range
+                    pixel_x = point.x
+                    pixel_y = point.y
+                    pixel_z = point.z
+                    cv2.circle(datasets[0].cv_image ,(int(pixel_u), int(pixel_v)), 1,(255,0,0),-1)
 
                 vis = cv2.resize(datasets[0].cv_image, (640,480))
                 cv2.imshow('vis',vis)
