@@ -16,7 +16,7 @@ from lidar2cam_projection.msg import pixel_ranges
 from lidar2cam_projection.msg import pixel_range
 
 import rospy
-from shapely import geometry
+
 
 class pixel_range_sub(object):
     def __init__(self):
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     rospy.init_node('pixel_listener', anonymous=True)
     pixel_range_dat = pixel_range_sub()
-    pixel_threshold = 20
+    pixel_threshold = 10
     time.sleep(1)
 
     torch.backends.cudnn.benchmark = True
@@ -147,7 +147,7 @@ if __name__ == "__main__":
                             if out_j[k, i] > 0:
                                 ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
                                 # store_ppp.append(ppp)
-                                cv2.circle(extracted_image,ppp,10,(0,255,255),-1)
+                                cv2.circle(extracted_image,ppp,5,(0,255,255),-1)
                                 line.append(ppp)
                         line_list.append(line)
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                         line2_u.append(pixel_u)
                         line2_v.append(pixel_v)
 
-                    cv2.circle(extracted_image,(int(pixel_u), int(pixel_v)), 1, color,-1)
+                    cv2.circle(extracted_image,(int(pixel_u), int(pixel_v)), 2, color,-1)
 
                 line1_x_avg = np.average(line1_x)
                 line1_y_avg = np.average(line1_y)
@@ -246,15 +246,16 @@ if __name__ == "__main__":
                 # print("LINE 2 z DEVIATION: ", line2_z_avg)
                 # print("\n")
 
-                cv2.putText(extracted_image, "LINE 1 X: "+str(round(line1_x_avg,2)), (int(line1_u_avg), int(line1_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
+                cv2.putText(extracted_image, "LINE 1 DEV: "+str(round(line1_x_avg,2)), (int(line1_u_avg+30), int(line1_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
                                                     1, (255,255,255), 2, cv2.LINE_AA)
-                cv2.putText(extracted_image, "LINE 1 Y: "+str(round(line1_y_avg,2)), (int(line1_u_avg), int(line1_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
+                # cv2.putText(extracted_image, "LINE 1 Y: "+str(round(line1_y_avg,2)), (int(line1_u_avg), int(line1_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
+                #                                     1, (255,255,255), 2, cv2.LINE_AA)
+
+                cv2.putText(extracted_image, "LINE 2 DEV: "+str(round(line2_x_avg,2)), (int(line2_u_avg+30), int(line2_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
                                                     1, (255,255,255), 2, cv2.LINE_AA)
 
-                cv2.putText(extracted_image, "LINE 2: "+str(round(line2_x_avg,2)), (int(line2_u_avg), int(line2_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
-                                                    1, (255,255,255), 2, cv2.LINE_AA)
-                cv2.putText(extracted_image, "LINE 2 Y: "+str(round(line2_y_avg,2)), (int(line2_u_avg), int(line2_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
-                                                    1, (255,255,255), 2, cv2.LINE_AA)
+                # cv2.putText(extracted_image, "LINE 2 Y: "+str(round(line2_y_avg,2)), (int(line2_u_avg), int(line2_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
+                #                                     1, (255,255,255), 2, cv2.LINE_AA)
 
                 vis = cv2.resize(extracted_image, (640,480))
                 cv2.imshow('vis',vis)
