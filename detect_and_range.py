@@ -16,6 +16,7 @@ from lidar2cam_projection.msg import pixel_ranges
 from lidar2cam_projection.msg import pixel_range
 
 import rospy
+from sensor_msgs.msg import Image
 
 
 class pixel_range_sub(object):
@@ -34,10 +35,13 @@ if __name__ == "__main__":
     rospy.init_node('pixel_listener', anonymous=True)
     pixel_range_dat = pixel_range_sub()
     pixel_threshold = 10
-    time.sleep(1)
+    
+    
 
     torch.backends.cudnn.benchmark = True
     args, cfg = merge_config()
+
+    rospy.wait_for_message(cfg.ros_topic, Image, timeout=60)
 
     dist_print('start testing...')
     assert cfg.backbone in ['18','34','50','101','152','50next','101next','50wide','101wide']
@@ -73,44 +77,44 @@ if __name__ == "__main__":
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
 
-    if cfg.dataset == 'ROS':
-        # import rospy 
-        # rospy.init_node('ros_ultrafast_lane', anonymous=True)
+    if cfg.dataset == 'CULane':
+        splits = ['test0_normal.txt', 'test1_crowd.txt', 'test2_hlight.txt', 'test3_shadow.txt', 'test4_noline.txt', 'test5_arrow.txt', 'test6_curve.txt', 'test7_cross.txt', 'test8_night.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
+        img_w, img_h = 1640, 590
+        row_anchor = culane_row_anchor
+
+    elif cfg.dataset == 'Tusimple':
+        splits = ['test.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms) for split in splits]
+        img_w, img_h = 1280, 720
+        row_anchor = tusimple_row_anchor
+
+    elif cfg.dataset == 'Live':
+        splits = ['test.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
+        print((datasets.__getitem__(0)[0][1]))
+        loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
+        img_w = loaded_im.shape[1]
+        img_h = loaded_im.shape[0]
+        row_anchor = tusimple_row_anchor
+    
+    elif cfg.dataset == 'ROS':
         splits = ['topic.txt']
         datasets = [LaneTestDatasetRos(cfg.ros_topic,img_transform = img_transforms) for split in splits]
         r = rospy.Rate(1)
         r.sleep()
 
+        loaded_im = datasets.__getitem__(0)[0][0]
+        img_w = datasets[0].cv_image.shape[1]
+        img_h = datasets[0].cv_image.shape[0]
+        row_anchor = tusimple_row_anchor
+        r = rospy.Rate(1000)
+
+    else:
+        raise NotImplementedError
+
+
     while not rospy.is_shutdown():
-        if cfg.dataset == 'CULane':
-            splits = ['test0_normal.txt', 'test1_crowd.txt', 'test2_hlight.txt', 'test3_shadow.txt', 'test4_noline.txt', 'test5_arrow.txt', 'test6_curve.txt', 'test7_cross.txt', 'test8_night.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
-            img_w, img_h = 1640, 590
-            row_anchor = culane_row_anchor
-
-        elif cfg.dataset == 'Tusimple':
-            splits = ['test.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms) for split in splits]
-            img_w, img_h = 1280, 720
-            row_anchor = tusimple_row_anchor
-
-        elif cfg.dataset == 'Live':
-            splits = ['test.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
-            print((datasets.__getitem__(0)[0][1]))
-            loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
-            img_w = loaded_im.shape[1]
-            img_h = loaded_im.shape[0]
-            row_anchor = tusimple_row_anchor
-        
-        elif cfg.dataset == 'ROS':
-            loaded_im = datasets.__getitem__(0)[0][0]
-            img_w = datasets[0].cv_image.shape[1]
-            img_h = datasets[0].cv_image.shape[0]
-            row_anchor = tusimple_row_anchor
-
-        else:
-            raise NotImplementedError
 
         pixel_info = pixel_range_dat.pixel_vector
         extracted_image = datasets[0].cv_image
@@ -136,9 +140,6 @@ if __name__ == "__main__":
                 loc[out_j == cfg.griding_num] = 0
                 out_j = loc
 
-                # import pdb; pdb.set_trace()
-                # vis = cv2.imread(os.path.join(cfg.data_root,names[0]))
-                # store_ppp = []
                 line_list = []
                 for i in range(out_j.shape[1]):
                     line = []
@@ -150,18 +151,6 @@ if __name__ == "__main__":
                                 cv2.circle(extracted_image,ppp,5,(0,255,255),-1)
                                 line.append(ppp)
                         line_list.append(line)
-
-                # min_list=min(line_list, key=len)
-                # for point_px in range(len(min_list)):
-                #     line_1_start = line_list[0][point_px]
-                #     line_2_start = line_list[1][point_px]
-
-                #     center_u = (line_1_start[0]+line_2_start[0])/2
-                #     center_v = (line_1_start[1]+line_2_start[1])/2
-
-                #     cv2.circle(datasets[0].cv_image,(int(line_1_start[0]),int(line_1_start[1])),10,(0,255,255),-1)
-                #     cv2.circle(datasets[0].cv_image,(int(line_2_start[0]),int(line_2_start[1])),10,(0,255,255),-1)
-                    # cv2.circle(datasets[0].cv_image,(int(center_u),int(center_v)),5,(255,255,255),-1)
 
                 lidar_point_master = []
                 for point in pixel_info.points:
@@ -182,90 +171,45 @@ if __name__ == "__main__":
                                 lidar_point_master.append([pixel_x, pixel_y, pixel_z, pixel_u, pixel_v, line])
                     cv2.circle(extracted_image,(int(pixel_u), int(pixel_v)), 1, color,-1)
 
+                for line_number in range(len(line_list)):
+                    this_line_x  = []
+                    this_line_y  = []
+                    this_line_z  = []
+                    this_line_u  = []
+                    this_line_v  = []
 
-                line1_x = []
-                line1_y = []
-                line1_z = []
-                line1_u = []
-                line1_v = []
+                    for matched_point in range(len(lidar_point_master)):
+                        extracted_point = lidar_point_master[matched_point]
+                        pixel_x =  extracted_point[0]
+                        pixel_y =  extracted_point[1]
+                        pixel_z =  extracted_point[2]
+                        pixel_u =  extracted_point[3]
+                        pixel_v =  extracted_point[4]
+                        line    =  extracted_point[5]
 
-                line2_x = []
-                line2_y = []
-                line2_z = []
-                line2_u = []
-                line2_v = []
+                        if line == line_number:
+                            color = (255,0,255)
+                            this_line_x.append(pixel_x)
+                            this_line_y.append(pixel_y)
+                            this_line_z.append(pixel_z)
+                            this_line_u.append(pixel_u)
+                            this_line_v.append(pixel_v)
 
+                        cv2.circle(extracted_image,(int(pixel_u), int(pixel_v)), 2, color,-1)
 
-                for matched_point in range(len(lidar_point_master)):
-                    extracted_point = lidar_point_master[matched_point]
-                    pixel_x =  extracted_point[0]
-                    pixel_y =  extracted_point[1]
-                    pixel_z =  extracted_point[2]
-                    pixel_u =  extracted_point[3]
-                    pixel_v =  extracted_point[4]
-                    line    =  extracted_point[5]
+                    line_x_avg = np.average(this_line_x)
+                    line_y_avg = np.average(this_line_y)
+                    line_z_avg = np.average(this_line_z)
+                    line_u_avg = np.average(this_line_u)
+                    line_v_avg = np.average(this_line_v)
 
-                    if line == 0:
-                        color = (255,0,255)
-                        line1_x.append(pixel_x)
-                        line1_y.append(pixel_y)
-                        line1_z.append(pixel_z)
-                        line1_u.append(pixel_u)
-                        line1_v.append(pixel_v)
-
-                    elif line == 1:
-                        color = (255,255,0)
-                        line2_x.append(pixel_x)
-                        line2_y.append(pixel_y)
-                        line2_z.append(pixel_z)
-                        line2_u.append(pixel_u)
-                        line2_v.append(pixel_v)
-
-                    cv2.circle(extracted_image,(int(pixel_u), int(pixel_v)), 2, color,-1)
-
-                line1_x_avg = np.average(line1_x)
-                line1_y_avg = np.average(line1_y)
-                line1_z_avg = np.average(line1_z)
-                line1_u_avg = np.average(line1_u)
-                line1_v_avg = np.average(line1_v)
-
-                line2_x_avg = np.average(line2_x)
-                line2_y_avg = np.average(line2_y)
-                line2_z_avg = np.average(line2_z)
-                line2_u_avg = np.average(line2_u)
-                line2_v_avg = np.average(line2_v)
-
-
-
-                # print("LINE 1 X DEVIATION: ", line1_x_avg)
-                # print("LINE 1 y DEVIATION: ", line1_y_avg)
-                # print("LINE 1 z DEVIATION: ", line1_z_avg)
-
-                # print("LINE 2 X DEVIATION: ", line2_x_avg)
-                # print("LINE 2 y DEVIATION: ", line2_y_avg)
-                # print("LINE 2 z DEVIATION: ", line2_z_avg)
-                # print("\n")
-
-                cv2.putText(extracted_image, "LINE 1 DEV: "+str(round(line1_x_avg,2)), (int(line1_u_avg+30), int(line1_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
-                                                    1, (255,255,255), 2, cv2.LINE_AA)
-                # cv2.putText(extracted_image, "LINE 1 Y: "+str(round(line1_y_avg,2)), (int(line1_u_avg), int(line1_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
-                #                                     1, (255,255,255), 2, cv2.LINE_AA)
-
-                cv2.putText(extracted_image, "LINE 2 DEV: "+str(round(line2_x_avg,2)), (int(line2_u_avg+30), int(line2_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
-                                                    1, (255,255,255), 2, cv2.LINE_AA)
-
-                # cv2.putText(extracted_image, "LINE 2 Y: "+str(round(line2_y_avg,2)), (int(line2_u_avg), int(line2_v_avg+50)), cv2.FONT_HERSHEY_SIMPLEX, 
-                #                                     1, (255,255,255), 2, cv2.LINE_AA)
-
+                    cv2.putText(extracted_image, "LINE "+str(line_number)+" DEV: "+str(round(line_x_avg,2)), (int(line_u_avg+30), int(line_v_avg)), cv2.FONT_HERSHEY_SIMPLEX, 
+                                                        1, (255,255,255), 2, cv2.LINE_AA)
+   
                 vis = cv2.resize(extracted_image, (640,480))
                 cv2.imshow('vis',vis)
-                # save_path = cfg.save_loc + '/some_name.jpg'
-                # print(save_path)
-                # cv2.imwrite(str(save_path),vis)
-                r = rospy.Rate(100)
-                r.sleep()
+
+                if cfg.dataset == 'ROS':
+                    r.sleep()
                 cv2.waitKey(1)
                 
-                # vout.write(vis)
-            
-            # vout.release()

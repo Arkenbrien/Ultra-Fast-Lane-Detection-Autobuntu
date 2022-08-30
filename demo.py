@@ -50,7 +50,28 @@ if __name__ == "__main__":
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
 
-    if cfg.dataset == 'ROS':
+    if cfg.dataset == 'CULane':
+        splits = ['test0_normal.txt', 'test1_crowd.txt', 'test2_hlight.txt', 'test3_shadow.txt', 'test4_noline.txt', 'test5_arrow.txt', 'test6_curve.txt', 'test7_cross.txt', 'test8_night.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
+        img_w, img_h = 1640, 590
+        row_anchor = culane_row_anchor
+
+    elif cfg.dataset == 'Tusimple':
+        splits = ['test.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms) for split in splits]
+        img_w, img_h = 1280, 720
+        row_anchor = tusimple_row_anchor
+
+    elif cfg.dataset == 'Live':
+        splits = ['test.txt']
+        datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
+        print((datasets.__getitem__(0)[0][1]))
+        loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
+        img_w = loaded_im.shape[1]
+        img_h = loaded_im.shape[0]
+        row_anchor = tusimple_row_anchor
+    
+    elif cfg.dataset == 'ROS':
         import rospy 
         rospy.init_node('ros_ultrafast_lane', anonymous=True)
         splits = ['topic.txt']
@@ -58,37 +79,16 @@ if __name__ == "__main__":
         r = rospy.Rate(1)
         r.sleep()
 
+        loaded_im = datasets.__getitem__(0)[0][0]
+        img_w = datasets[0].cv_image.shape[1]
+        img_h = datasets[0].cv_image.shape[0]
+        row_anchor = tusimple_row_anchor
+        r = rospy.Rate(1000)
+
+    else:
+        raise NotImplementedError
+
     while not rospy.is_shutdown():
-        if cfg.dataset == 'CULane':
-            splits = ['test0_normal.txt', 'test1_crowd.txt', 'test2_hlight.txt', 'test3_shadow.txt', 'test4_noline.txt', 'test5_arrow.txt', 'test6_curve.txt', 'test7_cross.txt', 'test8_night.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
-            img_w, img_h = 1640, 590
-            row_anchor = culane_row_anchor
-
-        elif cfg.dataset == 'Tusimple':
-            splits = ['test.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms) for split in splits]
-            img_w, img_h = 1280, 720
-            row_anchor = tusimple_row_anchor
-
-        elif cfg.dataset == 'Live':
-            splits = ['test.txt']
-            datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root,split),img_transform = img_transforms) for split in splits]
-            print((datasets.__getitem__(0)[0][1]))
-            loaded_im = cv2.imread(datasets.__getitem__(0)[0][1])
-            img_w = loaded_im.shape[1]
-            img_h = loaded_im.shape[0]
-            row_anchor = tusimple_row_anchor
-        
-        elif cfg.dataset == 'ROS':
-            loaded_im = datasets.__getitem__(0)[0][0]
-            img_w = datasets[0].cv_image.shape[1]
-            img_h = datasets[0].cv_image.shape[0]
-            row_anchor = tusimple_row_anchor
-
-        else:
-            raise NotImplementedError
-
         for split, dataset in zip(splits, datasets):
             loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle = False, num_workers=1)
             for i, data in enumerate(loader):
@@ -112,20 +112,21 @@ if __name__ == "__main__":
 
                 # import pdb; pdb.set_trace()
                 # vis = cv2.imread(os.path.join(cfg.data_root,names[0]))
+                extracted_image = datasets[0].cv_image
                 for i in range(out_j.shape[1]):
                     if np.sum(out_j[:, i] != 0) > 2:
                         for k in range(out_j.shape[0]):
                             if out_j[k, i] > 0:
                                 ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
-                                cv2.circle(datasets[0].cv_image,ppp,10,(0,0,255),-1)
+                                cv2.circle(extracted_image,ppp,10,(0,0,255),-1)
 
-                vis = cv2.resize(datasets[0].cv_image, (640,480))
+                vis = cv2.resize(extracted_image, (640,480))
                 cv2.imshow('vis',vis)
                 # save_path = cfg.save_loc + '/some_name.jpg'
                 # print(save_path)
                 # cv2.imwrite(str(save_path),vis)
-                r = rospy.Rate(1000)
-                r.sleep()
+                if cfg.dataset == 'ROS':
+                    r.sleep()
                 cv2.waitKey(1)
                 
                 # vout.write(vis)
